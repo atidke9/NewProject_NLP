@@ -212,6 +212,15 @@ test_data = test_data.reindex(columns=columns_titles)
 dict_map = {1:0, 2:1}
 test_data = test_data.replace({"Label": dict_map})
 
+data_list = test_data['cleaned_text'].tolist()
+arr_test = []
+for i in range(len(data_list)):
+    string = data_list[i]
+    tokens = nltk.word_tokenize(string)
+    if len(tokens) == 0:
+        arr_test.append(i)
+test_data = test_data.drop(index = arr_test)
+
 
 # data_train = pd.read_csv("SST-2/train.tsv", sep="\t")
 
