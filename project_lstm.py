@@ -295,19 +295,26 @@ if TRAIN:
                 pbar.set_postfix_str("Training Loss: {:.5f}".format(loss_train / train_steps))
 
         model.eval()
-        with torch.no_grad():
-            y_dev_pred = model(x_dev)
-            loss = criterion(y_dev_pred, y_dev)
-            loss_test = loss.item()
-
-        acc_dev = acc(x_dev, y_dev)
-        print("Epoch {} | Train Loss {:.5f}, Train Acc {:.2f} - Test Loss {:.5f}, Test Acc {:.2f}".format(
-            epoch, loss_train/train_steps, acc(x_train, y_train), loss_test, acc_dev))
-
-        if acc_dev > acc_dev_best and SAVE_MODEL:
+        y_test_pred = acc(x_dev, y_dev, return_labels=True)
+        accuracy = 100*accuracy_score(y_dev.cpu().numpy(), y_test_pred)
+        if accuracy > acc_dev_best and SAVE_MODEL:
             torch.save(model.state_dict(), "lstm_sentiment.pt")
             print("The model has been saved!")
-            acc_dev_best = acc_dev
+        
+#         model.eval()
+#         with torch.no_grad():
+#             y_dev_pred = model(x_dev)
+#             loss = criterion(y_dev_pred, y_dev)
+#             loss_test = loss.item()
+
+#         acc_dev = acc(x_dev, y_dev)
+#         print("Epoch {} | Train Loss {:.5f}, Train Acc {:.2f} - Test Loss {:.5f}, Test Acc {:.2f}".format(
+#             epoch, loss_train/train_steps, acc(x_train, y_train), loss_test, acc_dev))
+
+#         if acc_dev > acc_dev_best and SAVE_MODEL:
+#             torch.save(model.state_dict(), "lstm_sentiment.pt")
+#             print("The model has been saved!")
+#             acc_dev_best = acc_dev
 
 # %% ------------------------------------------ Final test -------------------------------------------------------------
 model.load_state_dict(torch.load("lstm_sentiment.pt"))
