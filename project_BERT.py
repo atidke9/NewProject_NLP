@@ -14,12 +14,6 @@ from textwrap import wrap
 from torch import nn, optim
 from torch.utils.data import Dataset, DataLoader
 
-# %matplotlib inline
-# %config InlineBackend.figure_format='retina'
-# sns.set(style='whitegrid', palette='muted', font_scale=1.2)
-# HAPPY_COLORS_PALETTE = ["#01BEFE", "#FFDD00", "#FF7D00", "#FF006D", "#ADFF02", "#8F00FF"]
-# sns.set_palette(sns.color_palette(HAPPY_COLORS_PALETTE))
-# rcParams['figure.figsize'] = 12, 8
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
@@ -33,18 +27,6 @@ class_names = [0,1]
 
 PRE_TRAINED_MODEL_NAME = 'bert-base-cased'
 tokenizer = BertTokenizer.from_pretrained(PRE_TRAINED_MODEL_NAME)
-
-import nltk
-token_lens = []
-for txt in train_data.cleaned_text:
-  tokens = nltk.word_tokenize(txt)
-  token_lens.append(len(tokens))
-
-fig, ax = plt.subplots(figsize=(10, 7))
-ax.hist(token_lens, bins=20)
-
-# Show plot
-plt.show()
 
 MAX_LEN = 160 #cannot be greater than 512
 
@@ -93,28 +75,6 @@ train_data_loader = create_data_loader(train_data, tokenizer, MAX_LEN, BATCH_SIZ
 val_data_loader = create_data_loader(val_data, tokenizer, MAX_LEN, BATCH_SIZE)
 test_data_loader = create_data_loader(test_data, tokenizer, MAX_LEN, BATCH_SIZE)
 
-"""Example text"""
-# bert_model = BertModel.from_pretrained(PRE_TRAINED_MODEL_NAME)
-#
-# sample_txt = 'When was I last outside? I am stuck at home for 2 weeks.'
-# encoding = tokenizer.encode_plus(
-#   sample_txt,
-#   max_length=32,
-#   add_special_tokens=True, # Add '[CLS]' and '[SEP]'
-#   return_token_type_ids=False,
-#   pad_to_max_length=True,
-#   return_attention_mask=True,
-#   return_tensors='pt',  # Return PyTorch tensors
-# )
-# encoding.keys()
-#
-# x = bert_model(
-#   input_ids=encoding['input_ids'],
-#   attention_mask=encoding['attention_mask']
-# )
-""""""
-
-
 class SentimentClassifier(nn.Module):
   def __init__(self, n_classes):
     super(SentimentClassifier, self).__init__()
@@ -133,19 +93,6 @@ class SentimentClassifier(nn.Module):
 
 model = SentimentClassifier(len(class_names))
 model = model.to(device)
-
-# data = next(iter(train_data_loader))
-# print(data['input_ids'].shape)
-# print(data['attention_mask'].shape)
-# print(data['targets'].shape)
-#
-# input_ids = data['input_ids'].to(device)
-# attention_mask = data['attention_mask'].to(device)
-#
-# print(input_ids.shape)
-# print(attention_mask.shape)
-#
-# batch_out = model(input_ids, attention_mask)
 
 EPOCHS = 2
 optimizer = AdamW(model.parameters(), lr=2e-5, correct_bias=False)
