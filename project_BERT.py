@@ -13,6 +13,7 @@ from collections import defaultdict
 from textwrap import wrap
 from torch import nn, optim
 from torch.utils.data import Dataset, DataLoader
+from tqdm import tqdm
 
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
@@ -105,28 +106,34 @@ scheduler = get_linear_schedule_with_warmup(
 loss_fn = nn.CrossEntropyLoss().to(device)
 
 def train_epoch( model, data_loader, loss_fn,
-  optimizer, device, scheduler, n_examples
+  optimizer, device, scheduler, n_examples, epoch
 ):
   model = model.train()
   losses = []
   correct_predictions = 0
-  for d in data_loader:
-    input_ids = d["input_ids"].to(device)
-    attention_mask = d["attention_mask"].to(device)
-    targets = d["targets"].to(device)
-    outputs = model(
-      input_ids=input_ids,
-      attention_mask=attention_mask
-    )
-    _, preds = torch.max(outputs, dim=1)
-    loss = loss_fn(outputs, targets)
-    correct_predictions += torch.sum(preds == targets)
-    losses.append(loss.item())
-    loss.backward()
-    nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-    optimizer.step()
-    scheduler.step()
-    optimizer.zero_grad()
+  loss_train, train_steps = 0, 0
+  with tqdm(total=total, desc="Epoch {}".format(epoch)) as pbar:
+    for d in data_loader:
+      input_ids = d["input_ids"].to(device)
+      attention_mask = d["attention_mask"].to(device)
+      targets = d["targets"].to(device)
+      outputs = model(
+        input_ids=input_ids,
+        attention_mask=attention_mask
+      )
+      _, preds = torch.max(outputs, dim=1)
+      loss = loss_fn(outputs, targets)
+      correct_predictions += torch.sum(preds == targets)
+      loss_train += loss.item()
+      losses.append(loss.item())
+      loss.backward()
+      nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+      optimizer.step()
+      scheduler.step()
+      optimizer.zero_grad()
+      train_steps += 1
+      pbar.update(1)
+      pbar.set_postfix_str("Training Loss: {:.5f}".format(loss_train / train_steps))
   return correct_predictions / n_examples, np.mean(losses)
 
 def eval_model(model, data_loader, loss_fn, device, n_examples):
@@ -160,7 +167,7 @@ for epoch in range(EPOCHS):
     optimizer,
     device,
     scheduler,
-    len(train_data)
+    len(train_data), epoch
   )
   print(f'Train loss {train_loss} accuracy {train_acc}')
   # val_acc, val_loss = eval_model(
