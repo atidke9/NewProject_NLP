@@ -202,6 +202,10 @@ for i in range(len(data_list)):
         arr.append(i)
 train_data = train_data.drop(index = arr)
 
+""" splitting train into train and validation dataframe """
+train_data, val_data = train_test_split(train_data, train_size=0.9, random_state=random_seed)
+train_data, val_data = train_data.reset_index(drop=True), val_data.reset_index(drop=True)
+
 test_data = pd.read_csv('test.csv', names = ['Label','Text'] )
 testData_list = test_data['Text'].tolist()
 cleaned_testData = cleanData(testData_list)
@@ -221,12 +225,12 @@ for i in range(len(data_list)):
         arr_test.append(i)
 test_data = test_data.drop(index = arr_test)
 
+train_data.to_csv('train_cleaned.csv')
+val_data.to_csv('val_cleaned.csv')
+test_data.to_csv('test_cleaned.csv')
 
-# data_train = pd.read_csv("SST-2/train.tsv", sep="\t")
 
 x_train_raw, y_train = train_data["cleaned_text"].values, torch.LongTensor(train_data["Label"].values).to(device)
-
-# data_dev = pd.read_csv("SST-2/dev.tsv", sep="\t")
 
 x_dev_raw, y_dev = test_data["cleaned_text"].values, torch.LongTensor(test_data["Label"].values).to(device)
 
