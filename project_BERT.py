@@ -15,21 +15,47 @@ from torch import nn, optim
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
+"""Setup"""
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+"""Import cleaned data"""
 train_data = pd.read_csv('train_cleaned.csv')
+
+#considering 25% of the train data to train the model, bigger model gives CUDA error with current GPU config
+train_data1, train_data2 = train_test_split(train_data, train_size=0.25, random_state=RANDOM_SEED)
+train_data1, train_data2 = train_data1.reset_index(drop=True), train_data2.reset_index(drop=True)
+#using train_data1 hereafter
+
 val_data = pd.read_csv('val_cleaned.csv')
 test_data = pd.read_csv('test_cleaned.csv')
 
 class_names = [0,1]
 
+"""Calculate max sequence length"""
 PRE_TRAINED_MODEL_NAME = 'bert-base-cased'
 tokenizer = BertTokenizer.from_pretrained(PRE_TRAINED_MODEL_NAME)
 
-MAX_LEN = 160 #cannot be greater than 512
+#Concatenating all the dataframes
+frames = [train_data1, val_data, test_data]
+df = pd.concat(frames)
+
+token_lens = []
+for txt in df.cleaned_text:
+  tokens = tokenizer.encode(txt, max_length=512)
+  token_lens.append(len(tokens))
+
+sns.distplot(token_lens)
+plt.xlim([0, 512])
+plt.xlabel('Token count')
+plt.show()
+
+#As can be seen from the graph, most of the reviews seem to contain less than 400 tokens, so we choose a maximum length of 400.
+
+"""Creating Dataloader"""
+MAX_LEN = 400 #cannot be greater than 512
 
 class GPReviewDataset(Dataset):
   def __init__(self, reviews, targets, tokenizer, max_len):
@@ -72,10 +98,13 @@ def create_data_loader(df, tokenizer, max_len, batch_size):
   )
 
 BATCH_SIZE = 16
-train_data_loader = create_data_loader(train_data, tokenizer, MAX_LEN, BATCH_SIZE)
+#creatinf train dataloader with the 25% split created above
+train_data_loader = create_data_loader(train_data1, tokenizer, MAX_LEN, BATCH_SIZE)
+
 val_data_loader = create_data_loader(val_data, tokenizer, MAX_LEN, BATCH_SIZE)
 test_data_loader = create_data_loader(test_data, tokenizer, MAX_LEN, BATCH_SIZE)
 
+"""Sentiment classifier and helper functions"""
 class SentimentClassifier(nn.Module):
   def __init__(self, n_classes):
     super(SentimentClassifier, self).__init__()
@@ -95,7 +124,7 @@ class SentimentClassifier(nn.Module):
 model = SentimentClassifier(len(class_names))
 model = model.to(device)
 
-EPOCHS = 2
+EPOCHS = 5
 optimizer = AdamW(model.parameters(), lr=2e-5, correct_bias=False)
 total_steps = len(train_data_loader) * EPOCHS
 scheduler = get_linear_schedule_with_warmup(
@@ -112,6 +141,7 @@ def train_epoch( model, data_loader, loss_fn,
   losses = []
   correct_predictions = 0
   loss_train, train_steps = 0, 0
+  total = len(train_data1) // BATCH_SIZE
   with tqdm(total=total, desc="Epoch {}".format(epoch)) as pbar:
     for d in data_loader:
       input_ids = d["input_ids"].to(device)
@@ -155,6 +185,7 @@ def eval_model(model, data_loader, loss_fn, device, n_examples):
       losses.append(loss.item())
   return correct_predictions.double() / n_examples, np.mean(losses)
 
+"""Training loop"""
 history = defaultdict(list)
 best_accuracy = 0
 for epoch in range(EPOCHS):
@@ -167,22 +198,55 @@ for epoch in range(EPOCHS):
     optimizer,
     device,
     scheduler,
-    len(train_data), epoch
+    len(train_data1), epoch
   )
   print(f'Train loss {train_loss} accuracy {train_acc}')
-  # val_acc, val_loss = eval_model(
-  #   model,
-  #   val_data_loader,
-  #   loss_fn,
-  #   device,
-  #   len(val_data)
-  # )
-  # print(f'Val   loss {val_loss} accuracy {val_acc}')
+  val_acc, val_loss = eval_model(
+    model,
+    val_data_loader,
+    loss_fn,
+    device,
+    len(val_data)
+  )
+  print(f'Val   loss {val_loss} accuracy {val_acc}')
   print()
   history['train_acc'].append(train_acc)
   history['train_loss'].append(train_loss)
-  # history['val_acc'].append(val_acc)
-  # history['val_loss'].append(val_loss)
-  # if val_acc > best_accuracy:
-  #   torch.save(model.state_dict(), 'best_model_state.bin')
-  #   best_accuracy = val_acc
+  history['val_acc'].append(val_acc)
+  history['val_loss'].append(val_loss)
+  if val_acc > best_accuracy:
+    torch.save(model.state_dict(), 'best_model_state.bin')
+    best_accuracy = val_acc
+
+"""Plotting train_acc, train_loss, val_acc, val_loss against the epochs"""
+train_acc_hist_arr = torch.stack(history['train_acc']).cpu().numpy()
+train_loss_hist_arr = np.array(history['train_loss'])
+val_acc_hist_arr = torch.stack(history['val_acc']).cpu().numpy()
+val_loss_hist_arr = np.array(history['val_loss'])
+
+EpochHistDF = pd.DataFrame({'train_acc': train_acc_hist_arr, 'train_loss': train_loss_hist_arr, 'val_acc': val_acc_hist_arr,
+                        'val_loss':val_loss_hist_arr}, columns=['train_acc', 'train_loss', 'val_acc', 'val_loss'])
+plt.plot(EpochHistDF['train_acc'], label='train accuracy')
+plt.plot(EpochHistDF['train_loss'], label='train loss')
+plt.plot(EpochHistDF['val_acc'], label='validation accuracy')
+plt.plot(EpochHistDF['val_loss'], label='validation loss')
+plt.title('Training history')
+plt.ylabel('Accuracy')
+plt.xlabel('Epoch')
+plt.legend()
+plt.show()
+
+"""Testing the best model"""
+model.load_state_dict(torch.load("best_model_state.pt"))
+model.eval()
+
+test_acc, _ = eval_model(
+  model,
+  test_data_loader,
+  loss_fn,
+  device,
+  len(test_data)
+)
+
+print("Test accuracy for the best model:",test_acc.item())
+""""""
