@@ -362,7 +362,7 @@ for i in range(len(test_data)):
     attention_mask = encoded_review['attention_mask'].to(device)
     output = model(input_ids, attention_mask)
     _, prediction = torch.max(output, dim=1)
-    predicted_label.append(prediction)
+    predicted_label.append(prediction.cpu().item())
     
 original_testdf = pd.read_csv('Test_submission_atidke9.csv', encoding='latin-1')
 original_testdf['Sentiment'] = predicted_label
