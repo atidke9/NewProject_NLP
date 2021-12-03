@@ -343,24 +343,24 @@ plt.show()
 # print("Test accuracy for the best model:",test_acc.item())
 # """"""
 
-model.load_weights('best_model_state.pt')
+model.load_state_dict(torch.load("best_model_state.bin"))
 # test_pred = model.predict(test_input)
 # test_pred.shape
 
-model = model.eval()
-pred_label = []
-test_data_loader = create_data_loader(test_data, tokenizer, MAX_LEN, BATCH_SIZE)
-with torch.no_grad():
-  for d in test_data_loader:
-    input_ids = d["input_ids"].to(device)
-    attention_mask = d["attention_mask"].to(device)
-    targets = d["targets"].to(device)
-    outputs = model(
-       input_ids=input_ids,
-       attention_mask=attention_mask
-      )
-    _, preds = torch.max(outputs, dim=1)
-    pred_label.append(preds)
+for i in range(len(test_data)):
+    text = test_data['Text'][i]
+    encoded_review = tokenizer.encode_plus( text,
+    max_length=MAX_LEN,
+    add_special_tokens=True,
+    return_token_type_ids=False,
+    pad_to_max_length=True,
+    return_attention_mask=True,
+    return_tensors='pt',
+    )
+    input_ids = encoded_review['input_ids'].to(device)
+    attention_mask = encoded_review['attention_mask'].to(device)
+    output = model(input_ids, attention_mask)
+    _, prediction = torch.max(output, dim=1)
+    test_data['Sentiment'][i]= prediction 
 
-test_data['Sentiment'] = pred_label
-test_data.to_csv('Test_submission_atidke9.csv', index = False)
+test_data.to_csv('Test_submission_atidke90.csv', index = False)
