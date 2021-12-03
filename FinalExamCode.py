@@ -21,7 +21,7 @@ from tqdm import tqdm
 
 
 
-PATH = os.getcwd() + '/DeepLearning/Deep-Learning/Pytorch/RNN/2_TextClassification/FinalExam'
+# PATH = os.getcwd() + '/DeepLearning/Deep-Learning/Pytorch/RNN/2_TextClassification/FinalExam'
 
 # nltk.download('stopwords')
 # nltk.download('wordnet')
@@ -45,7 +45,7 @@ def cleanData(list_of_strings):
         cleaned_list.append(cleanstring)
     return cleaned_list
 
-train_data = pd.read_csv(PATH +"/Train.csv", encoding='latin-1')
+train_data = pd.read_csv("Train.csv", encoding='latin-1')
 trainData_list = train_data['Text'].tolist()
 cleaned_trainData = cleanData(trainData_list)
 train_data['cleaned_text'] = cleaned_trainData
@@ -87,7 +87,7 @@ random_seed = 42
 train_data, val_data = train_test_split(train_data, train_size=0.9, random_state=random_seed)
 train_data, val_data = train_data.reset_index(drop=True), val_data.reset_index(drop=True)
 
-test_data = pd.read_csv(PATH +"/Test_submission_atidke9.csv", encoding='latin-1')
+test_data = pd.read_csv("Test_submission_atidke9.csv", encoding='latin-1')
 testData_list = test_data['Text'].tolist()
 cleaned_testData = cleanData(testData_list)
 test_data['cleaned_text'] = cleaned_testData
@@ -344,5 +344,23 @@ plt.show()
 # """"""
 
 model.load_weights('best_model_state.pt')
-test_pred = model.predict(test_input)
-test_pred.shape
+# test_pred = model.predict(test_input)
+# test_pred.shape
+
+model = model.eval()
+pred_label = []
+test_data_loader = create_data_loader(test_data, tokenizer, MAX_LEN, BATCH_SIZE)
+with torch.no_grad():
+  for d in test_data_loader:
+    input_ids = d["input_ids"].to(device)
+    attention_mask = d["attention_mask"].to(device)
+    targets = d["targets"].to(device)
+    outputs = model(
+       input_ids=input_ids,
+       attention_mask=attention_mask
+      )
+    _, preds = torch.max(outputs, dim=1)
+    pred_label.append(preds)
+
+test_data['Sentiment'] = pred_label
+test_data.to_csv('Test_submission_atidke9.csv', index = False)
