@@ -347,8 +347,9 @@ model.load_state_dict(torch.load("best_model_state.bin"))
 # test_pred = model.predict(test_input)
 # test_pred.shape
 
+predicted_label = []
 for i in range(len(test_data)):
-    text = test_data['Text'][i]
+    text = test_data['cleaned_text'][i]
     encoded_review = tokenizer.encode_plus( text,
     max_length=MAX_LEN,
     add_special_tokens=True,
@@ -361,6 +362,8 @@ for i in range(len(test_data)):
     attention_mask = encoded_review['attention_mask'].to(device)
     output = model(input_ids, attention_mask)
     _, prediction = torch.max(output, dim=1)
-    test_data['Sentiment'][i]= prediction 
-
-test_data.to_csv('Test_submission_atidke90.csv', index = False)
+    predicted_label.append(prediction)
+    
+original_testdf = pd.read_csv('Test_submission_atidke9.csv', encoding='latin-1')
+original_testdf['Sentiment'] = predicted_label
+original_testdf.to_csv('Test_submission_atidke9.csv', index = False)
